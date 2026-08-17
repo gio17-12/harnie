@@ -23,7 +23,7 @@ import llm
 import store
 import tools
 
-MODEL = "anthropic/claude-sonnet-4-6"  # usato se non passi il terzo argomento
+MODEL = "deepseek/deepseek-v4-flash-0731"  # usato se non passi il terzo argomento
 
 
 def main():
