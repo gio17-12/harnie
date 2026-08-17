@@ -46,7 +46,7 @@ ovvia che aggiungere una feature sia un esercizio, non un progetto.
 ## 2. Stack e dipendenze
 
 - Python 3.11+
-- `httpx` — la chiamata streaming a OpenRouter
+- `httpx` — la chiamata a OpenRouter
 - `python-dotenv` — lettura .env
 
 Due dipendenze, punto. Le estensioni previste ne aggiungono altre (es. pymupdf per i
@@ -101,8 +101,8 @@ Proprietà che questo formato compra, e che vanno difese:
   modificare una riga riscrive il passato per quanto ne sa il modello; copiare il
   file è un fork.
 - **Il payload è sempre ricostruibile**: il body spedito a OpenRouter è il file
-  incartato in `{"model": ..., "messages": [...], "stream": true}`. Niente log del
-  traffico: la chat È il log (la sonda payload_chat.py lo dimostra).
+  incartato in `{"model": ..., "messages": [...], "stream": false}`. Niente log
+  del traffico: la chat È il log (la sonda payload_chat.py lo dimostra).
 
 Un "progetto" non ha codice: è una cartella dove metti i file delle chat, con
 accanto, se vuoi, un file di prompt da incollare come prima riga delle chat nuove.
@@ -115,9 +115,10 @@ python turno.py <chat.jsonl> "<messaggio>" [modello]
 
 Comportamento, nell'ordine: carica il file (inesistente = chat nuova), appende il
 messaggio utente e lo salva SUBITO, fa girare `llm.run_turn`, renderizza gli eventi
-su stdout (testo in streaming; tool call e risultati come righe `[tool→]`/`[tool←]`;
-reasoning come `[sta ragionando…]`), e in un `finally` appende al file i messaggi
-prodotti dal turno — anche se il turno è crashato a metà, quello che c'era persiste.
+su stdout (reasoning come riga `[reasoning] ...`; testo stampato intero, non a
+pezzi; tool call e risultati come righe `[tool→]`/`[tool←]`), e in un `finally`
+appende al file i messaggi prodotti dal turno — anche se il turno è crashato a
+metà, quello che c'era persiste.
 
 ## 7. Il loop agentico (llm.py) — il cuore del progetto
 
@@ -126,8 +127,9 @@ max_iterations)`, il cui contratto completo è nell'header del file. Pseudocodic
 
 ```
 per iterazione in range(max_iterations):
-    risposta = POST openrouter /chat/completions (stream=True, tools=tools_attivi)
-    streamma i delta di testo come eventi "text"
+    risposta = POST openrouter /chat/completions (stream=False, tools=tools_attivi)
+    se c'è reasoning: yield evento "reasoning" (testo intero)
+    se c'è contenuto: yield evento "text" (testo intero, non a pezzi)
     se la risposta contiene tool_calls:
         per ogni tool_call:
             yield evento "tool_call"
@@ -140,9 +142,11 @@ per iterazione in range(max_iterations):
 yield "done"
 ```
 
-Eventi generati: `thinking` (al più uno per iterazione), `text`, `tool_call`,
-`tool_result`, `done`. OpenRouter: endpoint standard chat/completions, header
-Bearer, formato OpenAI, una sola code path per tutti i modelli.
+Eventi generati: `reasoning` (al più uno per iterazione, solo se il modello
+ragiona), `text` (al più uno per iterazione), `tool_call`, `tool_result`, `done`.
+OpenRouter: endpoint standard chat/completions, header Bearer, formato OpenAI,
+`stream: false` (risposta intera, tool call già complete, niente riassemblaggio
+di frammenti), una sola code path per tutti i modelli.
 
 Comportamento accettato: se il budget si esaurisce mentre il modello chiede ancora
 tool, il turno finisce senza testo conclusivo. Non va "corretto".
@@ -190,7 +194,8 @@ contenerle.
 ## 11. Definizione di "finito" (v1)
 
 1. `pip install -r requirements.txt`, chiave nel `.env`, e
-   `python turno.py prova.jsonl "ciao"` risponde in streaming e crea il file.
+   `python turno.py prova.jsonl "ciao"` risponde (risposta intera, non a pezzi) e
+   crea il file.
 2. Rilanciando con un secondo messaggio, il modello ricorda il primo: la
    continuità sta tutta nel file.
 3. Aggiungendo a mano una prima riga `{"role": "system", ...}`, il turno successivo

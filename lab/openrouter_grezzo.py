@@ -1,9 +1,11 @@
-"""Sonda: cosa passa DAVVERO sul filo tra noi e OpenRouter.
+"""Sonda: cosa passa DAVVERO sul filo tra noi e OpenRouter, in modalità streaming.
 
-Fa una singola chiamata in streaming e stampa ogni riga ricevuta con repr(),
-così vedi anche le righe vuote, i keepalive (": OPENROUTER PROCESSING"), i
-chunk di soli metadati (usage, costi) e il "[DONE]" finale — tutto ciò che
-llm.py normalmente filtra via.
+Fa una singola chiamata con `stream: true` e stampa ogni riga ricevuta con
+repr(), così vedi anche le righe vuote, i keepalive (": OPENROUTER PROCESSING"),
+i chunk di soli metadati (usage, costi) e il "[DONE]" finale. `llm.py` non usa
+lo streaming (manda `stream: false` e aspetta la risposta intera): questa sonda
+esiste per far vedere com'è fatta la modalità streaming dell'API, non per
+spiegare cosa fa il codice del progetto.
 
 Si lancia dalla radice del repo (dove sta il .env):
     python lab/openrouter_grezzo.py "conta fino a 3"

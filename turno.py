@@ -3,8 +3,9 @@
     python turno.py <chat.jsonl> "<messaggio>" [modello]
 
 Appende il messaggio alla chat (creandola se non esiste), fa girare il loop
-agentico, streamma la risposta su stdout e appende al file quello che il turno
-ha prodotto. Non c'è altro: il "prodotto" è tutto qui.
+agentico, stampa su stdout ogni cosa che arriva (reasoning, testo, tool call e
+risultati, per intero, senza streaming né placeholder) e appende al file quello
+che il turno ha prodotto. Non c'è altro: il "prodotto" è tutto qui.
 
 Collegamenti: importa store (leggere/allungare il file), llm (il loop) e tools
 (la lista dei tool attivi). È l'unico file con un main: llm, store e tools sono
@@ -46,12 +47,12 @@ def main():
     try:
         # run_turn è un generatore di eventi: qui si decide solo come mostrarli.
         for event in llm.run_turn(messages, model, list(tools.TOOLS), llm.MAX_ITERATIONS):
-            if event["type"] == "text":
-                print(event["delta"], end="", flush=True)   # streaming vero: pezzo per pezzo
-            elif event["type"] == "thinking":
-                print("[sta ragionando…]", flush=True)
+            if event["type"] == "reasoning":
+                print(f"[reasoning] {event['text']}", flush=True)
+            elif event["type"] == "text":
+                print(event["text"], flush=True)   # la risposta intera, non a pezzi
             elif event["type"] == "tool_call":
-                print(f"\n[tool→] {event['name']} {json.dumps(event['args'], ensure_ascii=False)}",
+                print(f"[tool→] {event['name']} {json.dumps(event['args'], ensure_ascii=False)}",
                       flush=True)
             elif event["type"] == "tool_result":
                 print(f"[tool←] {event['preview']}", flush=True)
@@ -60,7 +61,6 @@ def main():
         # a metà persiste i messaggi che ha fatto in tempo a produrre.
         for msg in messages[start:]:
             store.append(path, msg)
-    print()  # a capo finale, per non lasciare il prompt della shell attaccato al testo
 
 
 main()
