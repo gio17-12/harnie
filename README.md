@@ -110,9 +110,11 @@ nell'ordine in cui accadono; `done` chiude sempre un turno riuscito:
 ```
 
 **Le righe del file** sono messaggi wire OpenAI, quattro forme possibili (system,
-user, assistant con eventuali `tool_calls`, tool con `tool_call_id`): l'esempio
-completo è in SPEC §5. Non esiste una forma "nostra": ciò che sta nel file è ciò
-che parte sul filo.
+user, assistant con eventuali `tool_calls` e un `reasoning` opzionale, tool con
+`tool_call_id`): l'esempio completo è in SPEC §5. Non esiste una forma "nostra":
+ciò che sta nel file è ciò che parte sul filo — **compreso il reasoning**: se non
+finisse nel file sarebbe l'unica cosa che vedi a schermo e poi sparisce per
+sempre, il che romperebbe la promessa "la chat È il log".
 
 **Una voce del registry** è documentata in testa a `tools.py`: schema JSON formato
 OpenAI (ciò che il modello vede) + funzione Python (ciò che gira), nomi dei

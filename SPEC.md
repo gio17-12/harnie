@@ -86,10 +86,15 @@ system prompt della chat. Esempio completo di una chat con una tool call:
 ```
 {"role": "system", "content": "Rispondi sempre in rima."}
 {"role": "user", "content": "che ore sono?"}
-{"role": "assistant", "content": "", "tool_calls": [{"id": "abc", "type": "function", "function": {"name": "now", "arguments": "{}"}}]}
+{"role": "assistant", "content": "", "reasoning": "L'utente chiede l'ora: chiamo il tool now.", "tool_calls": [{"id": "abc", "type": "function", "function": {"name": "now", "arguments": "{}"}}]}
 {"role": "tool", "tool_call_id": "abc", "content": "2026-08-10 15:02:11"}
 {"role": "assistant", "content": "Le tre e un po', direi così, / il tempo vola, siamo qui!"}
 ```
+
+Il campo `reasoning` su un messaggio `assistant` è opzionale: c'è solo se in quel
+giro il modello ha ragionato (OpenRouter lo restituisce così). Non salvarlo
+sarebbe l'unica cosa mostrata a schermo (evento `reasoning`, README) e mai
+scritta nel file: romperebbe "la chat È il log" (§5, sotto).
 
 Proprietà che questo formato compra, e che vanno difese:
 

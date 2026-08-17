@@ -59,8 +59,9 @@ def run_turn(messages, model, tools_enabled, max_iterations):
         # I modelli reasoning (es. gpt-5) possono restituire il ragionamento in un
         # campo a parte: lo mostriamo intero e grezzo, non dietro un placeholder
         # (streaming dei reasoning token è comunque fuori scope, SPEC §10).
-        if message.get("reasoning"):
-            yield {"type": "reasoning", "text": message["reasoning"]}
+        reasoning = message.get("reasoning")
+        if reasoning:
+            yield {"type": "reasoning", "text": reasoning}
 
         # "content" può essere null (l'API lo usa così quando c'è solo una tool
         # call): lo normalizziamo a stringa vuota per tenerlo omogeneo nel file.
@@ -68,18 +69,26 @@ def run_turn(messages, model, tools_enabled, max_iterations):
         if text:
             yield {"type": "text", "text": text}
 
+        # Il messaggio che entra in conversazione: il reasoning ci finisce dentro
+        # anche lui, altrimenti sarebbe l'unica cosa mostrata a schermo e mai
+        # scritta nel file — che romperebbe "la chat È il log".
+        assistant_msg = {"role": "assistant", "content": text}
+        if reasoning:
+            assistant_msg["reasoning"] = reasoning
+
         tool_calls = message.get("tool_calls")
 
         # Nessuna tool call: il modello ha semplicemente risposto. Il messaggio
         # entra in conversazione e il turno è finito.
         if not tool_calls:
-            messages.append({"role": "assistant", "content": text})
+            messages.append(assistant_msg)
             break
 
         # Ci sono tool call: arrivano già intere (niente streaming, niente
         # frammenti da riassemblare), quindi il messaggio dell'assistant entra in
         # conversazione così com'è (l'API esige di rivederlo al giro dopo)...
-        messages.append({"role": "assistant", "content": text, "tool_calls": tool_calls})
+        assistant_msg["tool_calls"] = tool_calls
+        messages.append(assistant_msg)
 
         # ...poi si esegue ogni tool e il suo risultato entra in conversazione
         # come messaggio role=tool, legato alla chiamata dal tool_call_id.

@@ -12,7 +12,7 @@ dipende dal progetto, così resta vera anche se il progetto cambia.
 import json
 import sys
 
-MODEL = "anthropic/claude-sonnet-4-6"
+MODEL = "deepseek/deepseek-v4-flash-0731"
 
 messages = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8") if line.strip()]
 

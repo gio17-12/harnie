@@ -14,7 +14,7 @@ import os
 import httpx
 from dotenv import load_dotenv
 
-MODEL = "anthropic/claude-sonnet-4-6"
+MODEL = "deepseek/deepseek-v4-flash-0731"
 
 load_dotenv()
 
