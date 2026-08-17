@@ -1,10 +1,10 @@
-"""Sonda: il body esatto che turno.py spedirebbe a OpenRouter per una chat.
+"""Sonda: il body esatto che main.py spedirebbe a OpenRouter per una chat.
 
 Dimostra la proprietà centrale del design: siccome il file JSONL è già in
 formato wire, il payload di qualsiasi turno è ricostruibile in ogni momento —
 è letteralmente il file, incartato. Niente da loggare: la chat È il log.
 
-    python lab/payload_chat.py mia_chat.jsonl
+    python src/harness/lab/payload_chat.py chats/mia_chat.jsonl
 
 La lettura del JSONL è riscritta qui in una riga, di proposito: una sonda non
 dipende dal progetto, così resta vera anche se il progetto cambia.

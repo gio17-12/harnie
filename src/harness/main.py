@@ -1,6 +1,6 @@
 """L'harness completo, in un comando:
 
-    python turno.py <chat.jsonl> "<messaggio>" [modello]
+    python src/harness/main.py <chat.jsonl> "<messaggio>" [modello]
 
 Appende il messaggio alla chat (creandola se non esiste), fa girare il loop
 agentico, stampa su stdout ogni cosa che arriva (reasoning, testo, tool call e

@@ -7,7 +7,7 @@ l'id nel primo frammento, il nome e gli argomenti a pezzi. Questo è il problema
 che `llm.py` evita del tutto: usa `stream: false`, quindi le tool call gli
 arrivano già intere, senza bisogno di riassemblare nulla.
 
-    python lab/tool_call_grezza.py
+    python src/harness/lab/tool_call_grezza.py
 """
 import os
 

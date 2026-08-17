@@ -8,7 +8,7 @@ esiste per far vedere com'è fatta la modalità streaming dell'API, non per
 spiegare cosa fa il codice del progetto.
 
 Si lancia dalla radice del repo (dove sta il .env):
-    python lab/openrouter_grezzo.py "conta fino a 3"
+    python src/harness/lab/openrouter_grezzo.py "conta fino a 3"
 
 Come tutte le sonde: stampa, non asserisce — l'assert sei tu. E non importa
 niente dal progetto: quello che vedi qui è l'API nuda, riproducibile ovunque.

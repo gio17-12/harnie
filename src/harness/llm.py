@@ -1,6 +1,6 @@
 """Il loop agentico: l'unico file che parla con OpenRouter.
 
-Collegamenti: importato da turno.py, che gli passa la conversazione caricata dal
+Collegamenti: importato da main.py, che gli passa la conversazione caricata dal
 file; importa tools.py per gli schemi e le funzioni del registry. Non sa cosa sia
 un file JSONL né un terminale: riceve una lista di messaggi formato OpenAI, la
 modifica in place, e genera eventi (dict) che il chiamante renderizza come vuole.
@@ -14,12 +14,12 @@ Contratto di run_turn:
   "name", "args"}, {"type": "tool_result", "name", "preview"}, e in chiusura
   {"type": "done"}.
 - effetto: appende a messages i messaggi assistant e tool prodotti; il chiamante
-  li persiste (turno.py lo fa in un finally).
+  li persiste (main.py lo fa in un finally).
 - errori: nessuna gestione (SPEC §1.5). Chiave mancante, rete giù, risposta
   malformata: eccezione e traceback.
 
 Per modificare: il protocollo degli eventi si cambia qui e dove viene consumato
-(l'elif di turno.py).
+(l'elif di main.py).
 """
 import json
 import os

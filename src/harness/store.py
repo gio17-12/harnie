@@ -1,6 +1,6 @@
 """La persistenza: una chat è un file JSONL, e questo file sa solo leggerlo e allungarlo.
 
-Collegamenti: importato da turno.py. Non sa cos'è OpenRouter né cos'è un turno:
+Collegamenti: importato da main.py. Non sa cos'è OpenRouter né cos'è un turno:
 vede solo righe JSON. Il formato è in SPEC §5: una riga = un messaggio formato
 OpenAI, la prima riga può essere il system prompt (role: system).
 

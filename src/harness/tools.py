@@ -1,7 +1,7 @@
 """Il registry dei tool: puro dato, nessuna logica.
 
 Collegamenti: importato da llm.py (che manda gli "schema" a OpenRouter ed esegue
-le "fn" con fn(**args)) e da turno.py (che attiva list(TOOLS)). In v1 il registry
+le "fn" con fn(**args)) e da main.py (che attiva list(TOOLS)). In v1 il registry
 è vuoto: il loop agentico è completo ma non scatta finché non registri un tool.
 
 Per aggiungere un tool: una funzione + una voce qui, nient'altro (ricette pronte

@@ -12,26 +12,33 @@ prima di toccare qualsiasi cosa.
 ```
 cp .env.example .env        # chiave OpenRouter (openrouter.ai → Keys)
 pip install -r requirements.txt
-python turno.py prova.jsonl "ciao, presentati in una riga"
+python src/harness/main.py chats/prova.jsonl "ciao, presentati in una riga"
 ```
 
 La risposta viene stampata sul terminale (si aspetta la risposta intera, niente
-streaming a caratteri) e `prova.jsonl` viene creato con dentro il turno. Per continuare la conversazione, stesso comando con il messaggio
-dopo; per cambiare modello, terzo argomento (es. `openai/gpt-5`) — il default è la
-costante `MODEL` in cima a `turno.py`. Se dimentichi la chiave, crash con
-`KeyError`: è il design (SPEC §1.5), non un baco.
+streaming a caratteri) e `chats/prova.jsonl` viene creato con dentro il turno —
+`chats/` è la cartella (ignorata da git) dove finiscono le chat che generi
+usando l'harness da questo stesso repo, così il codice in `src/` resta pulito.
+Per continuare la conversazione, stesso comando con il messaggio dopo; per
+cambiare modello, terzo argomento (es. `openai/gpt-5`) — il default è la
+costante `MODEL` in cima a `src/harness/main.py`. Se dimentichi la chiave,
+crash con `KeyError`: è il design (SPEC §1.5), non un baco.
 
 ## Cos'è una chat (la parte importante)
 
-Apri `prova.jsonl`: ogni riga è un messaggio nel formato esatto che l'API vuole.
-Questo compra tutto il resto senza una riga di codice:
+Apri `chats/prova.jsonl`: ogni riga è un messaggio nel formato esatto che l'API
+vuole. Questo compra tutto il resto senza una riga di codice:
 
 ```
-cp prova.jsonl fork.jsonl            # fork della conversazione
-scp prova.jsonl amico@host:          # trasferirla: l'altro ce l'ha IDENTICA
-sed -i '$d' prova.jsonl              # riavvolgere di un messaggio (o: editor)
-git init && git add *.jsonl          # versionarle; i branch sono fork
+cp chats/prova.jsonl chats/fork.jsonl   # fork della conversazione
+scp chats/prova.jsonl amico@host:       # trasferirla: l'altro ce l'ha IDENTICA
+sed -i '$d' chats/prova.jsonl           # riavvolgere di un messaggio (o: editor)
 ```
+
+`chats/` qui dentro è solo un comodo playground locale, ignorato da git. Per
+un uso vero, un "progetto" (sotto) è tipicamente una cartella tutta sua,
+altrove sul disco: lì `git init && git add *.jsonl` ha senso, e i branch di
+quella cartella sono fork delle tue chat, non del codice dell'harness.
 
 Il system prompt è la prima riga, se ha `role: system` — la scrivi tu, a mano:
 
@@ -48,30 +55,37 @@ scelta del momento.
 ## Com'è fatto
 
 ```
-turno.py    il main: argomenti → carica file → loop → stampa eventi → salva
-llm.py      il loop agentico: parla con OpenRouter, esegue tool, ripete   ← IL CUORE
-store.py    leggere e allungare i file JSONL (≈15 righe di sostanza)
-tools.py    registry dei tool: puro dato (v1: vuoto, col formato documentato)
-lab/        le sonde: script standalone per guardare i pezzi da vicino
+src/harness/
+  main.py     l'entry point: argomenti → carica file → loop → stampa eventi → salva
+  llm.py      il loop agentico: parla con OpenRouter, esegue tool, ripete   ← IL CUORE
+  store.py    leggere e allungare i file JSONL (≈15 righe di sostanza)
+  tools.py    registry dei tool: puro dato (v1: vuoto, col formato documentato)
+  lab/        le sonde: script standalone per guardare i pezzi da vicino
+chats/        le chat che generi tu, ignorata da git — non è codice
 ```
 
 Il grafo delle importazioni è una linea, senza cicli:
 
 ```
-turno.py ──> store.py
-    └──> llm.py ──> tools.py
+main.py ──> store.py
+   └──> llm.py ──> tools.py
 ```
 
 `llm.py` non sa cosa sia un file né un terminale; `store.py` non sa cosa sia
 OpenRouter. Ogni file apre con un header che dichiara ruolo, collegamenti e punti
 di modifica, e i blocchi di codice sono narrati da commenti (SPEC §1.8): l'header
-è il contratto, i commenti sono la storia, il codice la implementa.
+è il contratto, i commenti sono la storia, il codice la implementa. La cartella
+`src/harness/` è piatta esattamente come lo era la root prima: nessun ulteriore
+livello di sottocartelle oltre a `lab/` (SPEC §3) — l'unico scopo dello spostarla
+sotto `src/` è separare fisicamente il codice dai file che l'harness genera
+(`chats/`) e dai metadati del progetto (README, SPEC, `.env.example`), che
+restano nella root.
 
 ## Il flusso di un turno
 
-`python turno.py chat.jsonl "riassumi quanto detto finora"`:
+`python src/harness/main.py chat.jsonl "riassumi quanto detto finora"`:
 
-1. `turno.py` carica il file riga per riga (`store.load`: ogni riga un
+1. `main.py` carica il file riga per riga (`store.load`: ogni riga un
    `json.loads`), appende il tuo messaggio alla lista E al file — subito, così
    esiste anche se tra un istante tutto crasha.
 2. Passa la lista a `llm.run_turn`, un generatore. Questo fa la POST a OpenRouter
@@ -85,7 +99,7 @@ di modifica, e i blocchi di codice sono narrati da commenti (SPEC §1.8): l'head
    dell'"agente" è questo: una richiesta HTTP dentro un ciclo `for`, con un budget
    di giri (`MAX_ITERATIONS`). In v1 il registry è vuoto, quindi il ramo tool non
    scatta mai: l'esercizio 0 serve a vederlo in azione.
-3. Nel `finally`, turno.py appende al file i messaggi che il turno ha prodotto:
+3. Nel `finally`, main.py appende al file i messaggi che il turno ha prodotto:
    anche un turno crashato a metà persiste quello che c'era.
 
 Due proprietà da interiorizzare. **Non c'è stato nascosto da nessuna parte**: né
@@ -98,7 +112,7 @@ loggare, la chat È il log (la sonda `payload_chat.py` lo stampa).
 
 ## I contratti, precisamente
 
-**Gli eventi del loop** (prodotti da `run_turn`, consumati dall'elif di turno.py),
+**Gli eventi del loop** (prodotti da `run_turn`, consumati dall'elif di main.py),
 nell'ordine in cui accadono; `done` chiude sempre un turno riuscito:
 
 ```
@@ -120,17 +134,17 @@ sempre, il che romperebbe la promessa "la chat È il log".
 OpenAI (ciò che il modello vede) + funzione Python (ciò che gira), nomi dei
 parametri coincidenti perché l'esecuzione è `fn(**args)`.
 
-## Le sonde (lab/)
+## Le sonde (src/harness/lab/)
 
 Tre script per guardare i pezzi in isolamento. Stampano, non asseriscono:
 l'assert sei tu. E non importano niente dal progetto: sono l'API nuda, il che
 dimostra che nell'harness non c'è magia. Si lanciano dalla radice del repo:
 
 ```
-python lab/openrouter_grezzo.py "conta fino a 3"   # le righe SSE come arrivano,
-                                                   # keepalive e usage compresi
-python lab/payload_chat.py prova.jsonl             # il body esatto che partirebbe
-python lab/tool_call_grezza.py                     # una tool call arrivare A FRAMMENTI
+python src/harness/lab/openrouter_grezzo.py "conta fino a 3"   # le righe SSE come arrivano,
+                                                                # keepalive e usage compresi
+python src/harness/lab/payload_chat.py chats/prova.jsonl       # il body esatto che partirebbe
+python src/harness/lab/tool_call_grezza.py                     # una tool call arrivare A FRAMMENTI
 ```
 
 La terza è la più istruttiva: fa vedere perché una tool call in streaming arriva
@@ -155,7 +169,7 @@ resta nel file solo ciò che i giri precedenti hanno già completato.
 ### La ricetta base: aggiungere un tool
 
 Una funzione + una voce nel dict `TOOLS` di `tools.py` (formato in testa al
-file). Fine: turno.py attiva tutti i tool registrati, al turno dopo il modello lo
+file). Fine: main.py attiva tutti i tool registrati, al turno dopo il modello lo
 vede. La funzione ritorna una stringa; se solleva, il turno crasha. Quando
 aggiungi tool veri che parlano con la rete, il primo raffinamento sensato è
 restituire l'errore al modello come testo — deroga consapevole al crash-first,
@@ -187,10 +201,10 @@ TOOLS["now"] = {
 }
 ```
 
-`python turno.py t.jsonl "che ore sono?"` → vedrai `[tool→]` e `[tool←]` seguiti
-dalla risposta, e nel file le due righe nuove (assistant con tool_calls, tool col
-risultato). Se hai dovuto toccare altro oltre a tools.py, l'architettura si è
-rotta (SPEC §11.6).
+`python src/harness/main.py chats/t.jsonl "che ore sono?"` → vedrai `[tool→]` e
+`[tool←]` seguiti dalla risposta, e nel file le due righe nuove (assistant con
+tool_calls, tool col risultato). Se hai dovuto toccare altro oltre a
+`src/harness/tools.py`, l'architettura si è rotta (SPEC §11.6).
 
 ### Esercizio 1: ricerca web
 
@@ -199,7 +213,7 @@ a `.env` e SPEC §4). In `tools.py`: `web_search(query)` con httpx (già in
 requirements), risultati concatenati come testo semplice; facoltativo
 `fetch_url(url)` che scarica una pagina e strippa i tag. Nessun toggle da
 costruire: i tool registrati sono sempre attivi (se vuoi selezionarli per turno,
-è un argomento in più a turno.py che filtra `list(tools.TOOLS)`).
+è un argomento in più a main.py che filtra `list(tools.TOOLS)`).
 
 ### Esercizio 2: deep research
 
@@ -207,7 +221,7 @@ Non è un sistema: è lo stesso `run_turn` con più carburante. Serve l'esercizi
 Una costante `MAX_ITERATIONS_DEEP` (es. 25) in llm.py, un file di system prompt
 che istruisce a cercare a fondo e incrociare fonti (che incolli come prima riga
 della chat: il meccanismo esiste già!), e un modo per scegliere il budget da
-turno.py. Se ti scopri a progettare orchestratori e sotto-agenti, rileggi SPEC §7:
+main.py. Se ti scopri a progettare orchestratori e sotto-agenti, rileggi SPEC §7:
 il punto didattico è che non serve.
 
 ### Esercizio 3: leggere documenti
@@ -237,7 +251,7 @@ che legge (prompt injection: una pagina web o un documento possono contenere
 istruzioni che il modello esegue). Da solo e in locale è un rischio che puoi
 correre consapevolmente; combinato con la ricerca web va pensato due volte. La
 conferma manuale prima di eseguire (un `input()` nel rendering di `tool_call` in
-turno.py) è il naturale esercizio 5.
+main.py) è il naturale esercizio 5.
 
 ### Esercizio 6: una UI sopra i file
 
@@ -261,4 +275,5 @@ il file più il loop, e deve restare usabile senza UI.
 
 ## Ordine di lettura consigliato
 
-`SPEC.md` → questo file → `store.py` → `tools.py` → `llm.py` → `turno.py` → le sonde in `lab/`.
+`SPEC.md` → questo file → `src/harness/store.py` → `src/harness/tools.py` →
+`src/harness/llm.py` → `src/harness/main.py` → le sonde in `src/harness/lab/`.
