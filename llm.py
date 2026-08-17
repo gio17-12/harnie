@@ -8,9 +8,10 @@ modifica in place, e genera eventi (dict) che il chiamante renderizza come vuole
 Contratto di run_turn:
 - input: messages (lista formato OpenAI, mutata in place), model (stringa
   OpenRouter), tools_enabled (nomi di voci di tools.TOOLS), max_iterations.
-- yield, nell'ordine in cui accadono: {"type": "thinking"} (al più uno per
-  iterazione), {"type": "text", "delta": str}, {"type": "tool_call", "name",
-  "args"}, {"type": "tool_result", "name", "preview"}, e in chiusura
+- yield, nell'ordine in cui accadono: {"type": "reasoning", "text": str} (al più
+  uno per iterazione, solo se il modello ragiona), {"type": "text", "text": str}
+  (la risposta intera, non a pezzi: non streammiamo), {"type": "tool_call",
+  "name", "args"}, {"type": "tool_result", "name", "preview"}, e in chiusura
   {"type": "done"}.
 - effetto: appende a messages i messaggi assistant e tool prodotti; il chiamante
   li persiste (turno.py lo fa in un finally).
@@ -40,90 +41,49 @@ def run_turn(messages, model, tools_enabled, max_iterations):
     tool_schemas = [{"type": "function", "function": tools.TOOLS[name]["schema"]}
                     for name in tools_enabled]
 
-    # IL LOOP. Ogni giro è una chiamata a OpenRouter con la conversazione com'è
-    # in quel momento. Se il modello risponde e basta, si esce; se chiama tool,
-    # si eseguono, i risultati si accodano alla conversazione, e si rifà il giro:
-    # il modello rilegge tutto e decide come proseguire. Tutta l'"agenticità" è qui.
+    # IL LOOP. Ogni giro è una POST a OpenRouter con la conversazione com'è in
+    # quel momento; si aspetta la risposta intera, niente streaming. Se il
+    # modello risponde e basta, si esce; se chiama tool, si eseguono, i risultati
+    # si accodano alla conversazione, e si rifà il giro: il modello rilegge tutto
+    # e decide come proseguire. Tutta l'"agenticità" è qui.
     for _ in range(max_iterations):
-        payload = {"model": model, "messages": messages, "stream": True}
+        payload = {"model": model, "messages": messages, "stream": False}
         if tool_schemas:
             payload["tools"] = tool_schemas
 
-        # Accumulatori del giro: il testo della risposta, le tool call (che
-        # arrivano a frammenti, indicizzati), e se abbiamo già segnalato il thinking.
-        text = ""
-        calls = {}       # index -> {id, name, args}
-        thinking = False
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=300)
+        if resp.status_code != 200:
+            raise RuntimeError(f"OpenRouter {resp.status_code}: {resp.text[:500]}")
+        message = resp.json()["choices"][0]["message"]
 
-        # La chiamata, in streaming: la risposta arriva come SSE, righe
-        # "data: {json}" chiuse da "data: [DONE]".
-        with httpx.stream("POST", OPENROUTER_URL, headers=headers,
-                          json=payload, timeout=300) as resp:
-            if resp.status_code != 200:
-                resp.read()  # httpx: il body va consumato prima di leggere .text
-                raise RuntimeError(f"OpenRouter {resp.status_code}: {resp.text[:500]}")
+        # I modelli reasoning (es. gpt-5) possono restituire il ragionamento in un
+        # campo a parte: lo mostriamo intero e grezzo, non dietro un placeholder
+        # (streaming dei reasoning token è comunque fuori scope, SPEC §10).
+        if message.get("reasoning"):
+            yield {"type": "reasoning", "text": message["reasoning"]}
 
-            for line in resp.iter_lines():
-                # Scarto tutto ciò che non è un evento dati (righe vuote, keepalive).
-                if not line.startswith("data: "):
-                    continue
-                data = line[len("data: "):]
-                if data == "[DONE]":
-                    break
-                chunk = json.loads(data)
+        # "content" può essere null (l'API lo usa così quando c'è solo una tool
+        # call): lo normalizziamo a stringa vuota per tenerlo omogeneo nel file.
+        text = message.get("content") or ""
+        if text:
+            yield {"type": "text", "text": text}
 
-                # OpenRouter manda anche chunk di soli metadati (es. usage): senza
-                # choices non c'è niente da streammare.
-                choices = chunk.get("choices")
-                if not choices:
-                    continue
-                delta = choices[0].get("delta") or {}
-
-                # I modelli reasoning (es. gpt-5) pensano prima di scrivere: i loro
-                # delta di reasoning non vengono streammati (SPEC §10), ma senza
-                # questo evento il chiamante resterebbe muto per tutta la durata.
-                if (delta.get("reasoning") or delta.get("reasoning_details")) and not thinking:
-                    thinking = True
-                    yield {"type": "thinking"}
-
-                # Il testo vero e proprio: accumulato per il messaggio finale,
-                # streammato subito come evento.
-                if delta.get("content"):
-                    text += delta["content"]
-                    yield {"type": "text", "delta": delta["content"]}
-
-                # Le tool call arrivano SPEZZATE su più delta: l'id nel primo
-                # frammento, nome e argomenti a pezzi. Si riassemblano per index.
-                for tc in delta.get("tool_calls") or []:
-                    call = calls.setdefault(tc["index"], {"id": "", "name": "", "args": ""})
-                    if tc.get("id"):
-                        call["id"] = tc["id"]
-                    fn = tc.get("function") or {}
-                    call["name"] += fn.get("name") or ""
-                    call["args"] += fn.get("arguments") or ""
+        tool_calls = message.get("tool_calls")
 
         # Nessuna tool call: il modello ha semplicemente risposto. Il messaggio
         # entra in conversazione e il turno è finito.
-        if not calls:
+        if not tool_calls:
             messages.append({"role": "assistant", "content": text})
             break
 
-        # Ci sono tool call: prima si mette in conversazione il messaggio
-        # dell'assistant che le contiene (l'API esige di rivederlo al giro dopo)...
-        assistant_msg = {
-            "role": "assistant",
-            "content": text,
-            "tool_calls": [
-                {"id": calls[i]["id"], "type": "function",
-                 "function": {"name": calls[i]["name"], "arguments": calls[i]["args"]}}
-                for i in sorted(calls)
-            ],
-        }
-        messages.append(assistant_msg)
+        # Ci sono tool call: arrivano già intere (niente streaming, niente
+        # frammenti da riassemblare), quindi il messaggio dell'assistant entra in
+        # conversazione così com'è (l'API esige di rivederlo al giro dopo)...
+        messages.append({"role": "assistant", "content": text, "tool_calls": tool_calls})
 
         # ...poi si esegue ogni tool e il suo risultato entra in conversazione
         # come messaggio role=tool, legato alla chiamata dal tool_call_id.
-        for tc in assistant_msg["tool_calls"]:
+        for tc in tool_calls:
             name = tc["function"]["name"]
             args = json.loads(tc["function"]["arguments"] or "{}")
             yield {"type": "tool_call", "name": name, "args": args}

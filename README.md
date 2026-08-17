@@ -15,8 +15,8 @@ pip install -r requirements.txt
 python turno.py prova.jsonl "ciao, presentati in una riga"
 ```
 
-La risposta arriva in streaming sul terminale e `prova.jsonl` viene creato con
-dentro il turno. Per continuare la conversazione, stesso comando con il messaggio
+La risposta viene stampata sul terminale (si aspetta la risposta intera, niente
+streaming a caratteri) e `prova.jsonl` viene creato con dentro il turno. Per continuare la conversazione, stesso comando con il messaggio
 dopo; per cambiare modello, terzo argomento (es. `openai/gpt-5`) — il default è la
 costante `MODEL` in cima a `turno.py`. Se dimentichi la chiave, crash con
 `KeyError`: è il design (SPEC §1.5), non un baco.
@@ -75,15 +75,16 @@ di modifica, e i blocchi di codice sono narrati da commenti (SPEC §1.8): l'head
    `json.loads`), appende il tuo messaggio alla lista E al file — subito, così
    esiste anche se tra un istante tutto crasha.
 2. Passa la lista a `llm.run_turn`, un generatore. Questo fa la POST a OpenRouter
-   con `stream: true` e rilancia i pezzetti di testo come eventi `text`, che
-   turno.py stampa man mano. Se il modello produce reasoning (es. gpt-5), un
-   evento `thinking` evita il silenzio. Se il modello chiama un tool, `run_turn`
-   lo esegue (`TOOLS[nome]["fn"](**args)`), accoda il risultato alla conversazione
-   come messaggio `role: tool`, e **rifà la richiesta da capo** con la
-   conversazione allungata. Tutto il segreto dell'"agente" è questo: una richiesta
-   HTTP dentro un ciclo `for`, con un budget di giri (`MAX_ITERATIONS`). In v1 il
-   registry è vuoto, quindi il ramo tool non scatta mai: l'esercizio 0 serve a
-   vederlo in azione.
+   con `stream: false` e aspetta la risposta intera — niente frammenti da
+   ricomporre. Se il modello ha ragionato (es. gpt-5), il testo del ragionamento
+   arriva per intero in un evento `reasoning`, mostrato così com'è, non dietro un
+   placeholder. Il contenuto della risposta arriva per intero in un evento `text`.
+   Se il modello chiama un tool, `run_turn` lo esegue (`TOOLS[nome]["fn"](**args)`),
+   accoda il risultato alla conversazione come messaggio `role: tool`, e **rifà la
+   richiesta da capo** con la conversazione allungata. Tutto il segreto
+   dell'"agente" è questo: una richiesta HTTP dentro un ciclo `for`, con un budget
+   di giri (`MAX_ITERATIONS`). In v1 il registry è vuoto, quindi il ramo tool non
+   scatta mai: l'esercizio 0 serve a vederlo in azione.
 3. Nel `finally`, turno.py appende al file i messaggi che il turno ha prodotto:
    anche un turno crashato a metà persiste quello che c'era.
 
@@ -101,8 +102,8 @@ loggare, la chat È il log (la sonda `payload_chat.py` lo stampa).
 nell'ordine in cui accadono; `done` chiude sempre un turno riuscito:
 
 ```
-{"type": "thinking"}                                  al più uno per iterazione
-{"type": "text", "delta": "pezzo di testo"}           n volte
+{"type": "reasoning", "text": "…"}                    al più uno per iterazione, solo se il modello ragiona
+{"type": "text", "text": "risposta intera"}           al più uno per iterazione, non a pezzi
 {"type": "tool_call", "name": "x", "args": {...}}     se il modello chiama un tool
 {"type": "tool_result", "name": "x", "preview": "…"}  prime 200 battute del risultato
 {"type": "done"}                                      fine turno
@@ -130,9 +131,10 @@ python lab/payload_chat.py prova.jsonl             # il body esatto che partireb
 python lab/tool_call_grezza.py                     # una tool call arrivare A FRAMMENTI
 ```
 
-La terza è la più istruttiva: fa vedere il problema che l'accumulatore `calls`
-di llm.py risolve. E nella prima noterai il chunk `usage` con token e costo:
-l'harness non lo estrae, ma è lì ogni volta.
+La terza è la più istruttiva: fa vedere perché una tool call in streaming arriva
+a frammenti — il problema che `llm.py` evita del tutto scegliendo `stream: false`
+(risposta intera o niente, mai pezzi da ricomporre). E nella prima noterai il
+chunk `usage` con token e costo: l'harness non lo estrae, ma è lì ogni volta.
 
 ## Il modello degli errori: crash-first (SPEC §1.5)
 
@@ -141,8 +143,10 @@ rete giù, risposta malformata, argomento dimenticato sulla riga di comando:
 traceback e fine. Il terminale È la UI degli errori. `except` è vietato;
 `finally` è ammesso perché è pulizia (salvare ciò che il turno ha prodotto), non
 gestione. Il vantaggio didattico: ogni riga di codice fa una cosa sola, il
-percorso felice. Il costo, dichiarato: un turno crashato a metà risposta perde il
-testo parziale (il messaggio assistant si materializza solo a stream finito).
+percorso felice. Siccome non c'è streaming, non c'è nemmeno testo parziale da
+perdere: la POST a OpenRouter o torna con la risposta intera o solleva, e in quel
+caso il messaggio assistant di quel giro semplicemente non viene mai prodotto —
+resta nel file solo ciò che i giri precedenti hanno già completato.
 
 ## Come estendere
 

@@ -16,5 +16,5 @@ MODEL = "anthropic/claude-sonnet-4-6"
 
 messages = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8") if line.strip()]
 
-payload = {"model": MODEL, "messages": messages, "stream": True}
+payload = {"model": MODEL, "messages": messages, "stream": False}
 print(json.dumps(payload, ensure_ascii=False, indent=2))

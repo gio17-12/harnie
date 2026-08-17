@@ -1,10 +1,11 @@
-"""Sonda: come arriva una tool call sul filo — cioè A FRAMMENTI.
+"""Sonda: come arriva una tool call sul filo IN STREAMING — cioè A FRAMMENTI.
 
 Dichiara al modello un tool finto ("ora": basta la promessa, non serve che
-esista) e fa una domanda che lo costringe a usarlo. Poi stampa le righe grezze:
-vedrai la tool call arrivare spezzata su più delta — l'id nel primo frammento,
-il nome e gli argomenti a pezzi. È il motivo per cui llm.py ha l'accumulatore
-`calls` indicizzato: questa sonda ti fa vedere il problema che quel codice risolve.
+esista) e fa una domanda che lo costringe a usarlo, con `stream: true`. Poi
+stampa le righe grezze: vedrai la tool call arrivare spezzata su più delta —
+l'id nel primo frammento, il nome e gli argomenti a pezzi. Questo è il problema
+che `llm.py` evita del tutto: usa `stream: false`, quindi le tool call gli
+arrivano già intere, senza bisogno di riassemblare nulla.
 
     python lab/tool_call_grezza.py
 """
