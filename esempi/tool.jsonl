@@ -1,0 +1,4 @@
+{"role": "user", "content": "che ore sono? usa il tool."}
+{"role": "assistant", "content": "", "reasoning": "The user asks what time it is and to use the tool. Let me call now().", "tool_calls": [{"type": "function", "index": 0, "id": "call_f2ad40d88d814c1e8271bb1f", "function": {"name": "now", "arguments": "{}"}}]}
+{"role": "tool", "tool_call_id": "call_f2ad40d88d814c1e8271bb1f", "content": "2026-08-21 22:07:14"}
+{"role": "assistant", "content": "Sono le **22:07** (10:07 PM) del **21 agosto 2026**."}

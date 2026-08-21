@@ -152,6 +152,28 @@ a frammenti — il problema che `llm.py` evita del tutto scegliendo `stream: fal
 (risposta intera o niente, mai pezzi da ricomporre). E nella prima noterai il
 chunk `usage` con token e costo: l'harness non lo estrae, ma è lì ogni volta.
 
+## Esempi reali (esempi/)
+
+Se non vuoi (o non puoi) fare una chiamata vera per capire come si comporta
+l'harness, `esempi/` ha output reali e verificati, generati con
+`deepseek/deepseek-v4-flash-0731` via OpenRouter:
+
+```
+esempi/conversazione.jsonl        due turni di testo, uno con reasoning
+esempi/tool.jsonl                 un turno con tool call vera (esercizio 0)
+esempi/sonde/openrouter_grezzo.txt    SSE grezzo di "conta fino a 3"
+esempi/sonde/payload_chat.txt         il body ricostruito da conversazione.jsonl
+esempi/sonde/tool_call_grezza.txt     una tool call che arriva a frammenti
+```
+
+Apri `esempi/conversazione.jsonl` e nota una cosa non ovvia: il modello ragiona
+in **inglese** ma risponde in **italiano** — il campo `reasoning` non segue
+necessariamente la lingua della risposta finale, ed è un'altra ragione per cui
+vale la pena salvarlo per intero invece di riassumerlo o nasconderlo dietro un
+placeholder. `esempi/tool.jsonl` è stato prodotto registrando temporaneamente il
+tool dell'Esercizio 0 (sotto) — il registry in `tools.py` resta comunque vuoto
+di default, com'è previsto per la v1.
+
 ## Il modello degli errori: crash-first (SPEC §1.5)
 
 Non c'è gestione difensiva da nessuna parte, ed è una scelta. Chiave mancante,

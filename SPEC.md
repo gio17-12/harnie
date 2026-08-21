@@ -63,13 +63,17 @@ harnie/
     tools.py       # registry dei tool (v1: vuoto, col formato documentato)
     lab/           # le sonde: script standalone per osservare i pezzi (§9)
   chats/           # le chat generate dall'harness: ignorata da git, non è codice
+  esempi/          # output reali verificati, tracciati da git (README, "Esempi reali")
   .env.example     # OPENROUTER_API_KEY=
   SPEC.md          # questo file: la costituzione
   README.md        # avvio, architettura, flusso, contratti, ricette di estensione
 ```
 
 Il codice vive sotto `src/harness/`, separato dalla root che contiene solo
-metadati di progetto (config, documentazione) e dati generati (`chats/`). Dentro
+metadati di progetto (config, documentazione) e dati generati (`chats/`,
+`esempi/`). `chats/` è playground locale (ignorato da git); `esempi/` è
+l'opposto — output reali congelati e committati, così chi legge il progetto
+capisce cosa succede davvero senza dover per forza avere una chiave API. Dentro
 `src/harness/` vale lo stesso principio di prima, solo spostato di un livello:
 nessun altro file o sottocartella oltre quelli elencati, nessuna `utils/`,
 `core/`, `services/`. Lo spostamento in `src/` non è un'eccezione al principio
